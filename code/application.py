@@ -18,6 +18,7 @@ def main(arguments):
     # Depending on how fast your blockchain is,
     # this will return a proper result.
     print(storage.retrieve(key))
+    storage._blockchain.mine()
 
     # Using the callback object,
     # you can also wait for the operation to be completed.

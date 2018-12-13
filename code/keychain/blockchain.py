@@ -15,7 +15,7 @@ class Block:
         self.prev_hash = 0x0
         self.timestamp = datetime.datetime.now()
 
-    def proof(self):
+    def get_proof(self):
         """Return the proof of the current block."""
         return self.proof
 
@@ -34,19 +34,34 @@ class Block:
 
         return h.hexdigest()
 
+    def get_prevhash(self):
+        """Return the hash of the previous block."""
+        return self.prev_hash
+
+    def get_blockNo(self):
+        """ Return the block number"""
+        return self.blockNo
+
+    def set_genesis(self, transactions):
+        self.prev_hash = 0x0
+        self.nonce = 0
+        self._transactions = transactions
+        self.blockNo = 0
+        self.proof = 0
+        self.hash = self.get_hash()
 
 class Transaction:
-    def __init__(self, origin, recipient, value):
+    def __init__(self, origin, key, value):
         """A transaction, in our KV setting. A transaction typically involves
         some key, value and an origin (the one who put it onto the storage).
         """
-        self.recipient = recipient #Key
+        self.key = key #Key
         self.value = value
         self.origin = origin
 
         #raise NotImplementedError
     def get_transaction(self):
-        return {"recipient"   : self.recipient,
+        return {"key"   : self.key,
                 "value": self.value,
                 "origin": self.origin}
 
@@ -79,22 +94,21 @@ class Blockchain:
         # Bootstrap the chain with the specified bootstrap address.
         self._bootstrap(bootstrap)
 
+
     def _add_genesis_block(self):
         """Adds the genesis block to your blockchain."""
         block = Block()
-        block.prev_hash = 0x0
-        block.nonce = 0
-        block._transactions = self._transactions
-        block.blockNo = 0
-        block.proof = 0
-        block.hash = block.get_hash()
+        block.set_genesis(self._transactions)
+        self._transactions = [] #Reset transactions
+
         self._blocks.append(block)
 
 
     def _bootstrap(self, address):
         """Implements the bootstrapping procedure."""
         peer = Peer(address)
-        return 0
+        return 0 #TODO
+
     def difficulty(self):
         """Returns the difficulty level."""
         return self._difficulty
@@ -116,12 +130,13 @@ class Blockchain:
 
         node_test = 9999999999
         reward_transaction = Transaction(origin="0",
-                                         recipient=node_test,
+                                         key=node_test,
                                          value=1)
         self.add_transaction(reward_transaction)
         new_block = self.add_block(proof)
 
         print(">> BLOCK "+str(new_block.blockNo) + " MINED")
+        self.is_valid()
         return 0
 
     def is_valid(self):
@@ -133,15 +148,15 @@ class Blockchain:
         prev_block = None
         for index, block in enumerate(self._blocks):
             if  prev_block:
-                if prev_block.hash() != block.prev_hash:
+                if prev_block.get_hash() != block.get_prevhash():
                     return False
 
-                elif prev_block.index + 1 != block.index:
+                elif prev_block.get_blockNo() + 1 != block.get_blockNo():
                     return False
 
-                elif not self.valid_proof(prev_block.proof,
-                                      prev_block.hash,
-                                      block.proof):
+                elif not self.valid_proof(prev_block.get_proof(),
+                                      prev_block.get_hash(),
+                                      block.get_proof()):
                     return False
 
                 elif prev_block.timestamp >= block.timestamp:

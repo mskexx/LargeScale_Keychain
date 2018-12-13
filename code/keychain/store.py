@@ -15,11 +15,11 @@ class Callback:
 
     def wait(self):
         """Wait until the transaction appears in the blockchain."""
-        return 0
+        return 0 #TODO
 
     def completed(self):
         """Polls the blockchain to check if the data is available."""
-        return 0
+        return 0 #TODO
 
 
 class Storage:
@@ -36,7 +36,8 @@ class Storage:
         The block flag indicates whether the call should block until the value
         has been put onto the blockchain, or if an error occurred.
         """
-        transaction = Transaction("0",key, value)
+        #TODO
+        transaction = Transaction("0", key, value)
         self._blockchain.add_transaction(transaction)
         callback = Callback(transaction, self._blockchain)
         if block:
@@ -54,19 +55,20 @@ class Storage:
         for block in reversed(self._blockchain._blocks):
             for transaction in block.get_transactions():
                 info = transaction.get_transaction()
-                if info['recipient'] == key:
+                if info['key'] == key:
                     return info['value']
-        return 0
+        return "ERROR: No value for " + str(key)
 
     def retrieve_all(self, key):
-        """Retrieves all values associated with the specified key on the
+        """
+        Retrieves all values associated with the specified key on the
         complete blockchain.
         """
         results = []
         for block in reversed(self._blockchain._blocks):
             for transaction in block.get_transactions():
                 info = transaction.get_transaction()
-                if info['recipient'] == key:
+                if info['key'] == key:
                     print("Found in block ", block.blockNo, info["value"])
                     results.append(info['value'])
         return results
