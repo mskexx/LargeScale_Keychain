@@ -5,6 +5,8 @@ NB: Feel free to extend or modify.
 """
 import hashlib
 import datetime
+import requests
+from flask import Flask, request, jsonify
 
 class Block:
     def __init__(self):
@@ -49,6 +51,7 @@ class Block:
         self.blockNo = 0
         self.proof = 0
         self.hash = self.get_hash()
+        self.timestamp = 0
 
 class Transaction:
     def __init__(self, origin, key, value):
@@ -58,12 +61,22 @@ class Transaction:
         self.key = key #Key
         self.value = value
         self.origin = origin
+        self.timestamp = datetime.datetime.now()
 
         #raise NotImplementedError
     def get_transaction(self):
         return {"key"   : self.key,
                 "value": self.value,
                 "origin": self.origin}
+
+    def get_hash(self):
+        h = hashlib.sha256()
+        h.update(
+            str(self.key).encode('utf-8') +
+            str(self.value).encode('utf-8') +
+            str(self.origin).encode('utf-8')+
+            str(self.timestamp).encode('utf-8'))
+        return h.hexdigest()
 
 
 class Peer:
@@ -74,8 +87,11 @@ class Peer:
         """
         self._address = address
 
+    def get_address(self):
+        return str(self._address)
 
 class Blockchain:
+    app = Flask(__name__)
     def __init__(self, bootstrap, difficulty):
         """The bootstrap address serves as the initial entry point of
         the bootstrapping procedure. In principle it will contact the specified
@@ -83,6 +99,7 @@ class Blockchain:
         """
 
         # Initialize the properties.
+
         self._blocks = []
         self._peers = []
         self._difficulty = difficulty
@@ -92,7 +109,8 @@ class Blockchain:
         self._add_genesis_block()
 
         # Bootstrap the chain with the specified bootstrap address.
-        self._bootstrap(bootstrap)
+        if bootstrap:
+            self._bootstrap(bootstrap)
 
 
     def _add_genesis_block(self):
@@ -100,14 +118,18 @@ class Blockchain:
         block = Block()
         block.set_genesis(self._transactions)
         self._transactions = [] #Reset transactions
-
         self._blocks.append(block)
 
 
     def _bootstrap(self, address):
         """Implements the bootstrapping procedure."""
         peer = Peer(address)
-        return 0 #TODO
+        #Ask for peers to address
+        #Then start bootstrapping for example.. the peer with longest chain
+        r = requests.get('http://'+peer.get_address()+'/peers')
+        self._peers = r['peers']
+        self.resolve_conflicts()
+
 
     def difficulty(self):
         """Returns the difficulty level."""
@@ -122,22 +144,34 @@ class Blockchain:
         """
         self._transactions.append(transaction)
         #Now broadcast?
+        for peer in self._peers:
+            #send transaction to all
+            r = requests.post('http://'+peer.get_address()+'/transaction',
+                                     data=transaction.get_transaction())
+            #Ack of the transaction?
+
         return 0
+
     def mine(self):
         """Implements the mining procedure."""
         last_block = self._blocks[-1]
         proof = self.proof_of_work(last_block)
 
-        node_test = 9999999999
-        reward_transaction = Transaction(origin="0",
-                                         key=node_test,
-                                         value=1)
-        self.add_transaction(reward_transaction)
         new_block = self.add_block(proof)
+        print(">> BLOCK " + str(new_block.blockNo) + " MINED")
 
-        print(">> BLOCK "+str(new_block.blockNo) + " MINED")
-        self.is_valid()
-        return 0
+        for peer in self._peers:
+            # POST method on the peer address
+            data = {
+                'message': "Block mined",
+                'blockNo': new_block.get_blockNo(),
+                'transactions': new_block.get_transactions(),
+                'proof': new_block.get_proof(),
+                'prev_hash': new_block.get_prevhash(),
+            }
+            r = requests.post('http://' + peer.get_address() + '/newblock',
+                              data=data)
+        return new_block
 
     def is_valid(self):
         """Checks if the current state of the blockchain is valid.
@@ -165,6 +199,27 @@ class Blockchain:
             prev_block = block
         return True
 
+    def is_valid2(self, chain):
+        prev_block = None
+        for index, block in enumerate(chain._blocks):
+            if prev_block:
+                if prev_block.get_hash() != block.get_prevhash():
+                    return False
+
+                elif prev_block.get_blockNo() + 1 != block.get_blockNo():
+                    return False
+
+                elif not chain.valid_proof(prev_block.get_proof(),
+                                          prev_block.get_hash(),
+                                          block.get_proof()):
+                    return False
+
+                elif prev_block.timestamp >= block.timestamp:
+                    return False
+
+            prev_block = block
+        return True
+
     def add_block(self, proof):
         prev_block = self._blocks[-1]
 
@@ -172,12 +227,6 @@ class Blockchain:
         block.prev_hash = prev_block.get_hash()
         block.blockNo = prev_block.blockNo + 1
         block.proof = proof
-
-        #Check current block is correct ---------------
-        if len(self._blocks) == prev_block.blockNo:
-            print("Chain number is correct")
-        #----------------------------------------------
-
         block._transactions = self._transactions
         self._transactions = [] #Reset the actual transactions
 
@@ -202,4 +251,55 @@ class Blockchain:
         try_hash = h.hexdigest()
         return try_hash[:difficulty] == '0'*difficulty
 
+    def add_peer(self, address):
+        """
+        Adds a peer to the blockchain peers
+        """
+        self._peers.append(address)
 
+    def resolve_conflicts(self):
+        """
+        Resolve the conflict in the peer replacing the chain with the longest
+        one existing in the network
+        """
+        longest_chain = None
+        max_length = len(self._blocks)
+
+        for peer in self._peers:
+            response = requests.get(f'http://{peer}/chain')
+
+            if response.status_code == 200:
+                chain = response.json()['chain']
+
+                if len(chain) > max_length and self.is_valid2(chain):
+                    max_length = len(chain)
+                    longest_chain = chain
+
+        if longest_chain:
+            self.chain = longest_chain
+            return True
+        return False
+
+    #--------------------------------------------------------------------------
+
+    @app.route('/transaction', methods=['POST'])
+    def receive_transaction(self):
+        data = request.get_json()
+        transaction = Transaction(data['origin'], data['key'], data['value'])
+        self._transactions.append(transaction)
+        response = {'message': f'Transaction received'}
+        return jsonify(response), 201
+
+    @app.route('/newblock', methods=['POST'])
+    def receive_block(self):
+        data = request.get_json()
+        new_block = Block()
+        #TODO
+
+        response = {'message': f'Block received'}
+        return jsonify(response), 201
+
+
+    @app.route('/chain', methods=['GET'])
+    def chain(self):
+        return jsonify({'chain': self._blocks}), 200

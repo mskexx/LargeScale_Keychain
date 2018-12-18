@@ -15,20 +15,30 @@ class Callback:
 
     def wait(self):
         """Wait until the transaction appears in the blockchain."""
-        return 0 #TODO
+        while not self.completed():
+            #TODO How do you update the chain here? Wait for new blocks..
+            return True #CHANGE THIS
+        return True
 
     def completed(self):
         """Polls the blockchain to check if the data is available."""
-        return 0 #TODO
+        for block in reversed(self._chain._blocks):
+            for transaction in block.get_transactions():
+                if transaction.get_hash() == self._transaction.get_hash():
+                    return True
+        return False
 
 
 class Storage:
+
     def __init__(self, bootstrap, miner, difficulty):
         """Allocate the backend storage of the high level API, i.e.,
         your blockchain. Depending whether or not the miner flag has
         been specified, you should allocate the mining process.
         """
         self._blockchain = Blockchain(bootstrap, difficulty)
+        if miner:
+            new_block = self._blockchain.mine()
 
     def put(self, key, value, block=True):
         """Puts the specified key and value on the Blockchain.
@@ -36,7 +46,6 @@ class Storage:
         The block flag indicates whether the call should block until the value
         has been put onto the blockchain, or if an error occurred.
         """
-        #TODO
         transaction = Transaction("0", key, value)
         self._blockchain.add_transaction(transaction)
         callback = Callback(transaction, self._blockchain)
