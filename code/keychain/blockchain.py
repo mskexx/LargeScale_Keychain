@@ -4,80 +4,11 @@ Blockchain (stub).
 NB: Feel free to extend or modify.
 """
 import hashlib
-import datetime
 import requests
 from flask import Flask, request, jsonify
 
-class Block:
-    def __init__(self):
-        """Describe the properties of a block."""
-        self._transactions = []
-        self.blockNo = 0
-        self.proof = None
-        self.prev_hash = 0x0
-        self.timestamp = datetime.datetime.now()
-
-    def get_proof(self):
-        """Return the proof of the current block."""
-        return self.proof
-
-    def get_transactions(self):
-        """Returns the list of transactions associated with this block."""
-        return self._transactions
-
-    def get_hash(self):
-        h = hashlib.sha256()
-        h.update(
-            str(self.proof).encode('utf-8') +
-            str(self._transactions).encode('utf-8') +
-            str(self.prev_hash).encode('utf-8') +
-            str(self.timestamp).encode('utf-8') +
-            str(self.blockNo).encode('utf-8'))
-
-        return h.hexdigest()
-
-    def get_prevhash(self):
-        """Return the hash of the previous block."""
-        return self.prev_hash
-
-    def get_blockNo(self):
-        """ Return the block number"""
-        return self.blockNo
-
-    def set_genesis(self, transactions):
-        self.prev_hash = 0x0
-        self.nonce = 0
-        self._transactions = transactions
-        self.blockNo = 0
-        self.proof = 0
-        self.hash = self.get_hash()
-        self.timestamp = 0
-
-class Transaction:
-    def __init__(self, origin, key, value):
-        """A transaction, in our KV setting. A transaction typically involves
-        some key, value and an origin (the one who put it onto the storage).
-        """
-        self.key = key #Key
-        self.value = value
-        self.origin = origin
-        self.timestamp = datetime.datetime.now()
-
-        #raise NotImplementedError
-    def get_transaction(self):
-        return {"key"   : self.key,
-                "value": self.value,
-                "origin": self.origin}
-
-    def get_hash(self):
-        h = hashlib.sha256()
-        h.update(
-            str(self.key).encode('utf-8') +
-            str(self.value).encode('utf-8') +
-            str(self.origin).encode('utf-8')+
-            str(self.timestamp).encode('utf-8'))
-        return h.hexdigest()
-
+from keychain import Block
+from keychain import Transaction
 
 class Peer:
     def __init__(self, address):
@@ -91,13 +22,12 @@ class Peer:
         return str(self._address)
 
 class Blockchain:
-    app = Flask(__name__)
     def __init__(self, bootstrap, difficulty):
         """The bootstrap address serves as the initial entry point of
         the bootstrapping procedure. In principle it will contact the specified
         addres, download the peerlist, and start the bootstrapping procedure.
         """
-
+        self._addr = '127.0.0.1:5000'
         # Initialize the properties.
 
         self._blocks = []
@@ -109,16 +39,12 @@ class Blockchain:
         self._add_genesis_block()
 
         # Bootstrap the chain with the specified bootstrap address.
-        if bootstrap:
-            self._bootstrap(bootstrap)
+        self._bootstrap(bootstrap)
 
 
     def _add_genesis_block(self):
         """Adds the genesis block to your blockchain."""
-        block = Block()
-        block.set_genesis(self._transactions)
-        self._transactions = [] #Reset transactions
-        self._blocks.append(block)
+        self._blocks.append(Block())
 
 
     def _bootstrap(self, address):
@@ -233,15 +159,16 @@ class Blockchain:
         self._blocks.append(block)
         return block
 
+
     def proof_of_work(self, last_block):
         p_proof = last_block.proof
         p_hash = last_block.get_hash()
         proof = 0
-        while not self.valid_proof(p_proof, p_hash, proof):
+        while not self._valid_proof(p_proof, p_hash, proof):
             proof +=1
         return proof
 
-    def valid_proof(self, prev_proof, prev_hash, proof):
+    def _valid_proof(self, prev_proof, prev_hash, proof):
         difficulty = self.difficulty()
         h = hashlib.sha256()
         h.update(
@@ -281,25 +208,68 @@ class Blockchain:
         return False
 
     #--------------------------------------------------------------------------
-
-    @app.route('/transaction', methods=['POST'])
-    def receive_transaction(self):
-        data = request.get_json()
-        transaction = Transaction(data['origin'], data['key'], data['value'])
-        self._transactions.append(transaction)
-        response = {'message': f'Transaction received'}
-        return jsonify(response), 201
-
-    @app.route('/newblock', methods=['POST'])
-    def receive_block(self):
-        data = request.get_json()
-        new_block = Block()
-        #TODO
-
-        response = {'message': f'Block received'}
-        return jsonify(response), 201
+app = Flask(__name__)
+blockchain = Blockchain('127.0.0.1', 4)
+app.run(debug=True, port=5000)
 
 
-    @app.route('/chain', methods=['GET'])
-    def chain(self):
-        return jsonify({'chain': self._blocks}), 200
+@app.route('/transaction', methods=['POST'])
+def receive_transaction():
+    """
+    Receive a transaction from other peers
+    :return:
+    """
+    data = request.get_json()
+    transaction = Transaction(data['origin'], data['key'], data['value'])
+    blockchain._transactions.append(transaction)
+    response = {'message': f'Transaction received'}
+    return jsonify(response), 201
+
+@app.route('/newblock', methods=['POST'])
+def receive_block():
+    """
+    Receive a new mined block, validate it and if valid add to chain
+    :return:
+    """
+    data = request.get_json()
+    new_block = Block()
+    #TODO
+
+    response = {'message': f'Block received'}
+    return jsonify(response), 201
+
+
+@app.route('/chain', methods=['GET'])
+def chain():
+    """
+    Obtains the local chain and put it into json forman
+    :return: Local chain to the peer
+    """
+    blocks = []
+    for block in blockchain._blocks:
+        transactions = [vars(t) for t in block._transactions]
+        b = vars(block)
+        b['_transactions'] = transactions
+        blocks.append(b)
+
+    #TODO list json - dumps?
+    return jsonify({'chain': blocks}), 200
+
+#Related with register / ask peers
+@app.route("/register", methods=['POST'])
+def register_peer():
+    """
+    Registers the peer that called the method
+    :return:
+    """
+    data = request.get_json()
+    blockchain.add_peer(data['address'])
+    return 0 #TODO
+
+@app.route("/mine", methods=['GET'])
+def mine():
+    """
+    The peer will be mining
+    :return:
+    """
+    blockchain.mine()
