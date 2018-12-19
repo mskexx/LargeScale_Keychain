@@ -6,7 +6,7 @@ NB: Feel free to extend or modify.
 
 from keychain import Blockchain
 from keychain import Transaction
-
+import requests
 
 class Callback:
     def __init__(self, transaction, chain):
@@ -36,15 +36,28 @@ class Storage:
         your blockchain. Depending whether or not the miner flag has
         been specified, you should allocate the mining process.
         """
+        """
         self._blockchain = Blockchain(bootstrap, difficulty)
         if miner:
             new_block = self._blockchain.mine()
+        """
+
 
     def put(self, key, value, block=True):
         """Puts the specified key and value on the Blockchain.
 
         The block flag indicates whether the call should block until the value
         has been put onto the blockchain, or if an error occurred.
+        """
+        call = '/put'
+        ip = '127.0.0.1:5001' #TODO
+        data = {'origin': ip,
+                'key':key,
+                'value':value}
+
+        r = requests.post('http://'+ip+call, data=data)
+        if r.status_code == 200:
+            print("OK")
         """
         transaction = Transaction("0", key, value)
         self._blockchain.add_transaction(transaction)
@@ -53,6 +66,8 @@ class Storage:
             callback.wait()
 
         return callback
+        """
+
 
     def retrieve(self, key):
         """Searches the most recent value of the specified key.

@@ -15,6 +15,7 @@ def main(arguments):
     key = "info8002"
     value = "fun"
     callback = storage.put(key, value, block=False)
+    return 0
     # Depending on how fast your blockchain is,
     # this will return a proper result.
     print(storage.retrieve(key))

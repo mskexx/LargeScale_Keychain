@@ -28,7 +28,8 @@ _install_requires = [
     "hashlib",
     "numpy",
     "requests",
-    "time"
+    "time",
+    "datetime"
 ]
 
 _parameters = {
