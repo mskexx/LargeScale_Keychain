@@ -5,7 +5,6 @@ NB: Feel free to extend or modify.
 """
 import hashlib
 import requests
-from flask import Flask, request, jsonify
 from block import Block
 from transaction import Transaction
 
@@ -24,7 +23,7 @@ class Blockchain:
     def __init__(self, bootstrap, difficulty):
         """The bootstrap address serves as the initial entry point of
         the bootstrapping procedure. In principle it will contact the specified
-        addres, download the peerlist, and start the bootstrapping procedure.
+        address, download the peerlist, and start the bootstrapping procedure.
         """
         self._address = '127.0.0.1:5001' #TODO
         # Initialize the properties.
@@ -44,35 +43,6 @@ class Blockchain:
     def _add_genesis_block(self):
         """Adds the genesis block to your blockchain."""
         self._blocks.append(Block())
-
-    def _bootstrap(self, address):
-        """Implements the bootstrapping procedure."""
-
-        #Ask for peers to address ----------------------------------------------
-        r = requests.get('http://'+address+'/peers')
-        if r.status_code != 200:
-            print("[BOOTSTRAP] Bootstrap address not available")
-            return -1
-
-        self.add_peer(address)
-        for peer in r['peers']:
-            self.add_peer(peer)
-
-        for peer in self._peers: #Register new node in the other lists
-            petition = 'http://'+peer.get_address()+'/register'
-            requests.post(petition, data={'address':self._address})
-        #-----------------------------------------------------------------------
-        #bcast to get the blockchain
-        tmp_peers = self._peers
-        correct, peer = self.resolve_conflicts(tmp_peers) #Get longest chain
-        while not correct and tmp_peers:
-            print("[BOOTSTRAP] Bootstraped chain is not valid, trying again")
-            correct, peer = self.resolve_conflicts(tmp_peers)
-            tmp_peers = tmp_peers.remove(peer)
-
-        if not correct and not peer: #No chain or self chain is the best
-            print("[BOOTSTRAP] No chain to bootstrap")
-        return
 
     def difficulty(self):
         """Returns the difficulty level."""
@@ -141,8 +111,32 @@ class Blockchain:
         """
         self._peers.append(Peer(address))
 
-    #TODO----------------------------------------------
+    def build_chain(self, chain_data):
+        builded_chain = []
+        for block_dict in chain_data:
+            block = Block()
+            block.timestamp = block_dict['timestamp']
+            block.blockNo = block_dict['blockNo']
+            block.prev_hash = block_dict['prev_hash']
+            block.proof = block_dict['proof']
+            _t = []
+            for t in block_dict['_transactions']:
+                _t.append(Transaction(t['origin'], t['key'], t['value']))
+            block._transactions = _t
 
+            builded_chain.append(block)
+        return builded_chain
+
+    def valid_block(self, block):
+        prev_block = self._blocks[-1]
+        return  prev_block.get_hash() == block.get_prevhash() and \
+                prev_block.get_blockNo() + 1 == block.get_blockNo() and \
+                self._valid_proof(prev_block.get_proof(),
+                                   prev_block.get_hash(),
+                                   block.get_proof()) and \
+               prev_block.timestamp <= block.timestamp
+
+    #TODO----------------------------------------------
 
     def add_transaction(self, transaction):
         """Adds a transaction to your current list of transactions,
@@ -164,6 +158,7 @@ class Blockchain:
 
     def mine(self):
         """Implements the mining procedure."""
+
         last_block = self._blocks[-1]
         proof = self.proof_of_work(last_block)
 
@@ -187,6 +182,13 @@ class Blockchain:
         """
         Resolve the conflict in the peer replacing the chain with the longest
         one existing in the network
+
+        #TODO 1: New node in network
+            - Get peers
+        #TODO 2: ---
+
+        #TODO: Check each chain -> bcast
+
         """
         longest_chain = None
         max_length = len(self._blocks)
@@ -210,19 +212,35 @@ class Blockchain:
             return False, chain_peer
         return False, chain_peer
 
-    def build_chain(self, chain_data):
-        builded_chain = []
-        for block_dict in chain_data:
-            block = Block()
-            block.timestamp = block_dict['timestamp']
-            block.blockNo = block_dict['blockNo']
-            block.prev_hash = block_dict['prev_hash']
-            block.proof = block_dict['proof']
-            _t = []
-            for t in block_dict['_transactions']:
-                _t.append(Transaction(t['origin'], t['key'], t['value']))
-            block._transactions = _t
 
-            builded_chain.append(block)
-        return builded_chain
+    def vote_chain(self):
+        pass #TODO
 
+    def _bootstrap(self, address):
+        """Implements the bootstrapping procedure."""
+
+        #Ask for peers to address ----------------------------------------------
+        r = requests.get('http://'+address+'/peers')
+        if r.status_code != 200:
+            print("[BOOTSTRAP] Bootstrap address not available")
+            return -1
+
+        self.add_peer(address)
+        for peer in r['peers']:
+            self.add_peer(peer)
+
+        for peer in self._peers: #Register new node in the other lists
+            petition = 'http://'+peer.get_address()+'/register'
+            requests.post(petition, data={'address':self._address})
+        #-----------------------------------------------------------------------
+        #bcast to get the blockchain
+        tmp_peers = self._peers
+        correct, peer = self.resolve_conflicts(tmp_peers) #Get longest chain
+        while not correct and tmp_peers:
+            print("[BOOTSTRAP] Bootstraped chain is not valid, trying again")
+            correct, peer = self.resolve_conflicts(tmp_peers)
+            tmp_peers = tmp_peers.remove(peer)
+
+        if not correct and not peer: #No chain or self chain is the best
+            print("[BOOTSTRAP] No chain to bootstrap")
+        return

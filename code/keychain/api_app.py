@@ -82,11 +82,11 @@ def put():
     Register a new value with key in the block
     :return:
     """
-    print("NEW TRANSACTION")
     o = request.get_json()['origin']
     k =  request.get_json()['key']
     v =  request.get_json()['value']
     blockchain.add_transaction(Transaction(o, k, v))
+    return jsonify({'transaction': 0})
 
 #MINER
 @app.route("/mine", methods=['GET'])
@@ -96,9 +96,10 @@ def mine():
     :return:
     """
     blockchain.mine()
-    return "Finish mining"
+    return jsonify({'mining': True})
 
-
+#bcast / check nodes / block new
 
 #If app not in the end = 404
+#Maybe launched with python call systems from Store
 app.run(debug=True, port=5001)

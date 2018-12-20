@@ -36,6 +36,7 @@ class Storage:
         your blockchain. Depending whether or not the miner flag has
         been specified, you should allocate the mining process.
         """
+        self._address = '127.0.0.1:5001'
         """
         self._blockchain = Blockchain(bootstrap, difficulty)
         if miner:
@@ -49,18 +50,18 @@ class Storage:
         The block flag indicates whether the call should block until the value
         has been put onto the blockchain, or if an error occurred.
         """
-        call = '/put'
-        ip = '127.0.0.1:5001' #TODO
-        data = {'origin': ip,
+        api_url = 'http://' + self._address + '/put'
+        data = {'origin': self._address,
                 'key':key,
                 'value':value}
 
-        r = requests.post('http://'+ip+call, data=data)
-        if r.status_code == 200:
-            print("OK")
+        r = requests.post(api_url, data=data)
+        if r.status_code != 200:
+            print("[ERROR] No connection for retrieve value")
+            return -1
+
+        #TODO
         """
-        transaction = Transaction("0", key, value)
-        self._blockchain.add_transaction(transaction)
         callback = Callback(transaction, self._blockchain)
         if block:
             callback.wait()
@@ -76,23 +77,28 @@ class Storage:
         or implement some indexing schemes if you would like to do something
         more efficient.
         """
-        for block in reversed(self._blockchain._blocks):
-            for transaction in block.get_transactions():
-                info = transaction.get_transaction()
-                if info['key'] == key:
-                    return info['value']
-        return "ERROR: No value for " + str(key)
+        return self.retrieve_all(key, True)
 
-    def retrieve_all(self, key):
+
+    def retrieve_all(self, key, last=False):
         """
         Retrieves all values associated with the specified key on the
         complete blockchain.
         """
+        api_url = 'http://'+self._address+'/chain'
+        r = requests.get(api_url)
+        if r.status_code != 200:
+            print("[ERROR] No connection for retrieve blockchain")
+            return -1
+        chain = r.json()["chain"]
+
         results = []
-        for block in reversed(self._blockchain._blocks):
-            for transaction in block.get_transactions():
-                info = transaction.get_transaction()
-                if info['key'] == key:
-                    print("Found in block ", block.blockNo, info["value"])
-                    results.append(info['value'])
+        for block in reversed(chain):
+            #Convert from json?
+            print(block)
+            for transaction in reversed(block['_transactions']):
+                if transaction['key'] == key:
+                    if last: #Last value stored = retrieve
+                        return transaction['value']
+                    results.append(transaction['value'])
         return results
