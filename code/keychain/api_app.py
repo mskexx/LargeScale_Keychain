@@ -86,6 +86,16 @@ def send_peers():
     """
     return jsonify({'peers': blockchain._peers})
 
+@app.route("/resolve", methods=['GET'])
+def resolve_conflict():
+    """
+    Receive a petition that inform his chain is not the most common in the
+    network
+    :return:
+    """
+    chain_data = request.args['chain']
+    blockchain.replace_chain(chain_data)
+    return jsonify({'message': 'OK'})
 
 #New transaction
 @app.route("/put", methods=['POST'])

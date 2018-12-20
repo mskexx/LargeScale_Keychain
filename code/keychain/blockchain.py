@@ -175,40 +175,10 @@ class Blockchain:
                               data=data)
         return new_block
 
-    def resolve_conflicts(self, peers):
-        """
-        Resolve the conflict in the peer replacing the chain with the longest
-        one existing in the network
-
-        #TODO: Check each chain -> bcast
-
-        """
-        longest_chain = None
-        max_length = len(self._blocks)
-        chain_peer = None
-
-        for peer in peers:
-            call = 'http://'+peer+'/chain'
-            response = requests.get(call)
-
-            if response.status_code == 200:
-                chain = response.json()['chain']
-                if len(chain) > max_length:
-                    max_length = len(chain)
-                    longest_chain = chain
-                    chain_peer = peer
-
-        if longest_chain:
-            chain = self.build_chain(longest_chain)
-            self.chain = chain
-            if self.is_valid():
-                return True, chain_peer
-            return False, chain_peer
-        return False, chain_peer
-
-
+    # BOOTSTRAP AND CONFLICTS WITH THE CHAIN -----------------------------------
     def vote_chain(self):
         chains = {}
+        chains_data = {}
         for peer in self._peers:
             api_url = 'http://' + peer + '/chain'
             r = requests.get(api_url)
@@ -222,13 +192,14 @@ class Blockchain:
 
             if chain_hash not in chains:
                 chains[chain_hash] = []
+                chains_data[chain_hash] = chain
             chains[chain_hash].append(peer)
 
         best = max(chains, key=lambda x: chains[x])
         addresses = chains[best]
         print("Best is:", best)
         print("Best addresses:", chains[best])
-        return addresses
+        return addresses, chains_data[best]
 
 
     def _bootstrap(self, address):
@@ -264,19 +235,32 @@ class Blockchain:
             print(r.json())
         #-----------------------------------------------------------------------
         #bcast to get the blockchain
-        winners = self.vote_chain()
-        for win in winners:
-            api_url = 'http://' + win + '/chain'
+        winners, chain_data = self.vote_chain()
+        losers =  list(set(self._peers) - set(winners))
+        for peer in losers:
+            petition = 'http://' + peer + '/resolve'
+            r = requests.get(petition, {'chain': chain_data})
+            if r.status_code != 200:
+                print("[ERROR] No connection with peer on: "+peer)
+
+        if self.replace_chain(chain_data):
+            return True
+        return False
+
+    def ask_chain(self, peers):
+        for peer in peers:
+            api_url = 'http://' + peer + '/chain'
             r = requests.get(api_url)
             if r.status_code != 200:
                 print("[ERROR] No connection for blockchain")
                 return -1
-            chain = r.json()["chain"]
-            builded = self.build_chain(chain)
-            self._blocks = builded
-            print(self.is_valid())
+            return r.json()["chain"]
+        return None
+
+    def replace_chain(self, chain_data=None):
+        builded = self.build_chain(chain_data)
+        self._blocks = builded
+        if self.is_valid():
             return True
         return False
-
-
         #--------------------
