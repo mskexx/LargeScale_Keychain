@@ -214,7 +214,28 @@ class Blockchain:
 
 
     def vote_chain(self):
-        pass #TODO
+        chains = {}
+        for peer in self._peers:
+            api_url = 'http://' + peer.get_address() + '/chain'
+            r = requests.get(api_url)
+            if r.status_code != 200:
+                print("[ERROR] No connection for blockchain")
+                return -1
+            chain = r.json()["chain"]
+
+            #Maybe chain to hash-->
+            if chain not in chains:
+                chains[chain] = {'votes': 0, 'peers':[]}
+
+            chains[chain]['votes'] += 1
+            chains[chain]['peers'].append(peer.get_address())
+
+        best = max(chains, key=lambda x: chains[x]['votes'])
+        addresses = chains[best]['peers']
+        return best, addresses
+
+
+
 
     def _bootstrap(self, address):
         """Implements the bootstrapping procedure."""
