@@ -5,11 +5,23 @@ from transaction import Transaction
 from blockchain import Blockchain
 
 
-test_address = '127.0.0.1:5001'
+def parse_arguments():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=5001)
+    arguments, _ = parser.parse_known_args()
+    return arguments
+
+import socket
+address = socket.gethostbyname(socket.gethostname())
+port = str(parse_arguments().port)
+
+t ='127.0.0.1'+ ":" + port
+b = '127.0.0.1' + ":" + str(5001)
 diff = 4
 
 app = Flask(__name__)
-blockchain = Blockchain(test_address, diff)
+blockchain = Blockchain(b, diff, port)
 
 #RECEIVE OBJECTS
 @app.route('/transaction', methods=['POST'])
@@ -21,7 +33,7 @@ def receive_transaction():
     data = request.get_json()
     transaction = Transaction(data['origin'], data['key'], data['value'])
     blockchain._transactions.append(transaction)
-    response = {'message': f'Transaction received'}
+    response = {'message': 'Transaction received'}
     return jsonify(response)
 
 @app.route('/newblock', methods=['POST'])
@@ -56,14 +68,15 @@ def chain():
 
 
 #PEERS
-@app.route("/register", methods=['POST'])
+@app.route("/register", methods=['GET'])
 def register_peer():
     """
     Add to the list of peers the peer that called
     :return:
     """
-    data = request.get_json()
-    blockchain.add_peer(data['address'])
+    addr = request.args['address']
+    blockchain.add_peer(addr)
+    return jsonify({'message': 'OK'})
 
 @app.route("/peers", methods=['GET'])
 def send_peers():
@@ -71,8 +84,7 @@ def send_peers():
     Send local list of peers to the caller
     :return: list of peers
     """
-    peers = [peer.get_address() for peer in blockchain._peers]
-    return jsonify({'peers': peers})
+    return jsonify({'peers': blockchain._peers})
 
 
 #New transaction
@@ -102,4 +114,4 @@ def mine():
 
 #If app not in the end = 404
 #Maybe launched with python call systems from Store
-app.run(debug=True, port=5001)
+app.run(debug=True, port=parse_arguments().port)
