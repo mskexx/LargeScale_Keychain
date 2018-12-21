@@ -52,11 +52,12 @@ class Storage:
         data = {'origin': self._address,
                 'key':key,
                 'value':value}
-        print(data)
+
         r = requests.get(api_url, data)
         if r.status_code != 200:
             print("[ERROR] No connection for retrieve value")
             return -1
+
         #TODO
         """
         callback = Callback(transaction, self._blockchain)
@@ -91,8 +92,6 @@ class Storage:
 
         results = []
         for block in reversed(chain):
-            #Convert from json?
-            print(block)
             for transaction in reversed(block['_transactions']):
                 if transaction['key'] == key:
                     if last: #Last value stored = retrieve
