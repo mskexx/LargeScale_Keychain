@@ -5,8 +5,7 @@ NB: Feel free to extend or modify.
 """
 
 import requests
-from api_app import app
-from threading import Thread
+from keychain.api_app import app
 
 class Callback:
     def __init__(self, transaction, chain):
@@ -36,8 +35,7 @@ class Storage:
         been specified, you should allocate the mining process.
         """
         self._address = '127.0.0.1:5002'
-        server = Thread(target=app.run(debug=True, host=self._address)).start()
-
+        server = app.run()
 
         """
         self._blockchain = Blockchain(bootstrap, difficulty)

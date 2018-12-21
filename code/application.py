@@ -5,8 +5,8 @@ NB: Feel free to extend or modify.
 """
 
 import argparse
-from store import Storage
-import subprocess
+from keychain import store
+import time
 def main(arguments):
     #Launch node
     #----------------
@@ -15,12 +15,11 @@ def main(arguments):
     # Adding a key-value pair to the storage.
     key = "info8002"
     value = "fun"
+    time.sleep(10)
     callback = storage.put(key, value, block=False)
     # Depending on how fast your blockchain is,
     # this will return a proper result.
     print(storage.retrieve(key))
-    while(True):
-        pass
     return 0
     #storage._blockchain.mine()
 
@@ -37,7 +36,8 @@ def main(arguments):
 
 
 def allocate_application(arguments):
-    application = Storage(
+    application = store.Storage(
+        port = arguments.port,
         bootstrap=arguments.bootstrap,
         miner=arguments.miner,
         difficulty=arguments.difficulty)
@@ -49,7 +49,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         "KeyChain - An overengineered key-value store "
         "with version control, powered by fancy linked-lists.")
-
+    parser.add_argument("--port", type=int, default=5001)
     parser.add_argument("--miner", type=bool, default=False, nargs='?',
                         const=True, help="Starts the mining procedure.")
     parser.add_argument("--bootstrap", type=str, default=None,

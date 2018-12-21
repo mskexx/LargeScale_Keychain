@@ -1,15 +1,13 @@
 import requests
 from flask import Flask, request, jsonify
-from block import Block
-from transaction import Transaction
-from blockchain import Blockchain
+from keychain.transaction import Transaction
+from keychain.blockchain import Blockchain
 
 
 def parse_arguments():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5001)
-    parser.add_argument("--addr", type=str, default='127.0.0.1')
     parser.add_argument("--difficulty", type=int, default=5,
                         help="Sets the difficulty of Proof of Work, only has "
                              "an effect with the `--miner` flag has been set.")
@@ -18,21 +16,17 @@ def parse_arguments():
     parser.add_argument("--bootstrap", type=str, default=None,
                         help="Sets the address of the bootstrap node.")
 
-
     arguments, _ = parser.parse_known_args()
     return arguments
 
 import socket
 address = socket.gethostbyname(socket.gethostname())
-port = str(parse_arguments().port)
-
-t ='127.0.0.1'+ ":" + port
-b = '127.0.0.1' + ":" + str(5001)
-diff = 4
 
 #CONFIGURATION
 app = Flask(__name__)
-blockchain = Blockchain(b, parse_arguments().difficulty, port)
+blockchain = Blockchain(parse_arguments().bootstrap,
+                        parse_arguments().difficulty,
+                        parse_arguments().port)
 
 
 #RECEIVE OBJECTS
@@ -46,7 +40,8 @@ def receive_transaction():
     o = t['origin']
     k = t['key']
     v = t['value']
-    tran = Transaction(o, k, v)
+    w = t['timestamp']
+    tran = Transaction(o, k, v, w)
     h = blockchain.add_transaction(tran)
     return jsonify({'transaction': h})
 
@@ -71,11 +66,14 @@ def receive_block():
     Receive a new mined block, validate it and if valid add to chain
     :return:
     """
-    data = request.get_json()
-    new_block = Block()
-    #TODO
+    data = request.args
 
-    response = {'message': f'Block received'}
+    new_block = blockchain.block_from_json(data)
+    if new_block:
+        blockchain._blocks.append(new_block)
+        response = {'message': 'Block confirmed'}
+    else:
+        response = {'message': 'Block denied'}
     return jsonify(response)
 
 
@@ -83,17 +81,13 @@ def receive_block():
 @app.route('/chain')
 def chain():
     """
-    Obtains the local chain and put it into json forman
+    Obtains the local chain and put it into json format
     :return: Local chain to the peer
     """
     blocks = []
-    for block in blockchain._blocks:
-        transactions = [vars(t) for t in block._transactions]
-        b = vars(block)
-        b['_transactions'] = transactions
-        blocks.append(b)
+    b = blockchain.to_json()
 
-    return jsonify({'chain': blocks})
+    return jsonify({'chain': b})
 
 
 #PEERS

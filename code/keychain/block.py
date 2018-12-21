@@ -1,5 +1,16 @@
-import datetime
+from datetime import datetime
 import hashlib
+from keychain.transaction import Transaction
+import json
+
+class TestEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Transaction):
+            return vars(o)
+        elif isinstance(o, datetime):
+            return o.isoformat()
+        print(o)
+        return json.JSONEncoder.default(self, o)
 
 class Block:
     def __init__(self):
@@ -8,7 +19,7 @@ class Block:
         self.blockNo = 0
         self.proof = None
         self.prev_hash = 0x0
-        self.timestamp = datetime.datetime.now()
+        self.timestamp = datetime.now().isoformat()
 
     def get_block(self): #Or maybe __dict__  better
         return {'blockNo': self.blockNo,

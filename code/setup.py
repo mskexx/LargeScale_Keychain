@@ -16,10 +16,11 @@ packages = find_packages(exclude=exclusions)
 
 # Get the version string of cag.
 with open(os.path.join("keychain", "__init__.py"), "rt") as fh:
-    _version = re.search(
-        '__version__\s*=\s*"(?P<version>.*)"\n',
-        fh.read()
-    ).group("version")
+    try:
+        _version = re.search('__version__\s*=\s*"(?P<version>.*)"\n',
+        fh.read()).group("version")
+    except:
+        pass
 
 # Module requirements.
 _install_requires = [
