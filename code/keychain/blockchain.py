@@ -108,7 +108,7 @@ class Blockchain:
         if address not in self._peers:
             self._peers.append(address)
 
-    def build_chain(self, chain_data):
+    def chain_from_json(self, chain_data):
         builded_chain = []
         for block_dict in chain_data:
             block = Block()
@@ -133,25 +133,128 @@ class Blockchain:
                                    block.get_proof()) and \
                prev_block.timestamp <= block.timestamp
 
+        # BOOTSTRAP AND CONFLICTS WITH THE CHAIN -----------------------------------
+
+    def vote_chain(self):
+        chains = {}
+        chains_data = {}
+        for peer in self._peers:
+            api_url = 'http://' + peer + '/chain'
+            r = requests.get(api_url)
+            if r.status_code != 200:
+                print("[ERROR] No connection for blockchain")
+                return -1
+            chain = r.json()["chain"]
+            builded = self.chain_from_json(chain)
+            hashes = [block.get_hash() for block in builded]
+            chain_hash = ''.join(hashes)
+
+            if chain_hash not in chains:
+                chains[chain_hash] = []
+                chains_data[chain_hash] = chain
+            chains[chain_hash].append(peer)
+
+        best = max(chains, key=lambda x: chains[x])
+        addresses = chains[best]
+        print("Best is:", best)
+        print("Best addresses:", chains[best])
+        return addresses, chains_data[best]
+
+    def ask_chain(self, peers):
+        for peer in peers:
+            api_url = 'http://' + peer + '/chain'
+            r = requests.get(api_url)
+            if r.status_code != 200:
+                print("[ERROR] No connection for blockchain")
+                return -1
+            return r.json()["chain"]
+        return None
+
+    def replace_chain(self, chain_data=None):
+        builded = self.chain_from_json(chain_data)
+        self._blocks = builded
+        if self.is_valid():
+            return True
+        return False
+        # --------------------
+
     #TODO----------------------------------------------
+    def _bootstrap(self, address):
+        """Implements the bootstrapping procedure."""
+        # Ask for peers to address ----------------------------------------------
+        r = requests.get('http://' + address + '/peers')
+        if r.status_code != 200:
+            print("[BOOTSTRAP] Bootstrap address not available")
+            return -1
+
+        self.add_peer(address)
+        l_peers = r.json()['peers']
+        if self._address in l_peers:
+            l_peers.remove(self._address)
+
+        for peer in l_peers:
+            self.add_peer(peer)
+
+        for peer in self._peers:  # Register new node in the other lists
+            petition = 'http://' + peer + '/register'  # TODO
+            try:
+                r = requests.get(petition, {'address': self._address})
+            except:
+                print("[ERROR] Request in peer ", peer)
+                self._peers.remove(peer)
+            if r.status_code != 200:
+                print("[ERROR] No connection with peer on: " + peer)
+                self._peers.remove(peer)
+                # TODO: SEND OTHER PEERS THAT THIS PEER IS NOT RESPONDING?
+
+            # testing purpose:
+            r = requests.get('http://' + peer + '/peers')
+            print(r.json())
+        # -----------------------------------------------------------------------
+        # bcast to get the blockchain
+        winners, chain_data = self.vote_chain()
+        losers = list(set(self._peers) - set(winners))
+        for peer in losers:
+            petition = 'http://' + peer + '/resolve'
+            r = requests.get(petition, {'chain': chain_data})
+            if r.status_code != 200:
+                print("[ERROR] No connection with peer on: " + peer)
+
+        if self.replace_chain(chain_data):
+            return True
+        return False
 
     def add_transaction(self, transaction):
+        print("[TRANSACTION] Transaction added to pool")
+        self._transactions.append(transaction)
+        return transaction.get_hash()
+
+    def add_transaction2(self, transaction):
         """Adds a transaction to your current list of transactions,
         and broadcasts it to your Blockchain network.
 
         If the `mine` method is called, it will collect the current list
         of transactions, and attempt to mine a block with those.
         """
+        acks = []
         self._transactions.append(transaction)
         #Now broadcast?
         print("Starting broadcast of transaction")
         for peer in self._peers:
             #send transaction to all
-            r = requests.post('http://'+peer+'/transaction',
-                                     data=transaction.get_transaction())
+            r = requests.get('http://'+peer+'/transaction',
+                             transaction.get_transaction())
             #Ack of the transaction?
+            if r.status_code == 200 and r.json()['transaction'] == \
+                    transaction.get_hash():
+                acks.append(peer)
+        if len(self._peers) == len(acks):
+            return True
+        return False
 
-        return 0
+
+
+
 
     def mine(self):
         """Implements the mining procedure."""
@@ -174,93 +277,3 @@ class Blockchain:
             r = requests.post('http://' + peer + '/newblock',
                               data=data)
         return new_block
-
-    # BOOTSTRAP AND CONFLICTS WITH THE CHAIN -----------------------------------
-    def vote_chain(self):
-        chains = {}
-        chains_data = {}
-        for peer in self._peers:
-            api_url = 'http://' + peer + '/chain'
-            r = requests.get(api_url)
-            if r.status_code != 200:
-                print("[ERROR] No connection for blockchain")
-                return -1
-            chain = r.json()["chain"]
-            builded = self.build_chain(chain)
-            hashes = [block.get_hash() for block in builded]
-            chain_hash = ''.join(hashes)
-
-            if chain_hash not in chains:
-                chains[chain_hash] = []
-                chains_data[chain_hash] = chain
-            chains[chain_hash].append(peer)
-
-        best = max(chains, key=lambda x: chains[x])
-        addresses = chains[best]
-        print("Best is:", best)
-        print("Best addresses:", chains[best])
-        return addresses, chains_data[best]
-
-
-    def _bootstrap(self, address):
-        """Implements the bootstrapping procedure."""
-        #Ask for peers to address ----------------------------------------------
-        r = requests.get('http://'+address+'/peers')
-        if r.status_code != 200:
-            print("[BOOTSTRAP] Bootstrap address not available")
-            return -1
-
-        self.add_peer(address)
-        l_peers = r.json()['peers']
-        if self._address in l_peers:
-            l_peers.remove(self._address)
-
-        for peer in l_peers:
-            self.add_peer(peer)
-
-        for peer in self._peers: #Register new node in the other lists
-            petition = 'http://'+peer+'/register' #TODO
-            try:
-                r = requests.get(petition, {'address':self._address})
-            except:
-                print("[ERROR] Request in peer ", peer)
-                self._peers.remove(peer)
-            if r.status_code != 200:
-                print("[ERROR] No connection with peer on: "+peer)
-                self._peers.remove(peer)
-                #TODO: SEND OTHER PEERS THAT THIS PEER IS NOT RESPONDING?
-
-            #testing purpose:
-            r = requests.get('http://' + peer + '/peers')
-            print(r.json())
-        #-----------------------------------------------------------------------
-        #bcast to get the blockchain
-        winners, chain_data = self.vote_chain()
-        losers =  list(set(self._peers) - set(winners))
-        for peer in losers:
-            petition = 'http://' + peer + '/resolve'
-            r = requests.get(petition, {'chain': chain_data})
-            if r.status_code != 200:
-                print("[ERROR] No connection with peer on: "+peer)
-
-        if self.replace_chain(chain_data):
-            return True
-        return False
-
-    def ask_chain(self, peers):
-        for peer in peers:
-            api_url = 'http://' + peer + '/chain'
-            r = requests.get(api_url)
-            if r.status_code != 200:
-                print("[ERROR] No connection for blockchain")
-                return -1
-            return r.json()["chain"]
-        return None
-
-    def replace_chain(self, chain_data=None):
-        builded = self.build_chain(chain_data)
-        self._blocks = builded
-        if self.is_valid():
-            return True
-        return False
-        #--------------------

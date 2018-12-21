@@ -4,8 +4,6 @@ KeyChain key-value store (stub).
 NB: Feel free to extend or modify.
 """
 
-from keychain import Blockchain
-from keychain import Transaction
 import requests
 
 class Callback:
@@ -36,7 +34,7 @@ class Storage:
         your blockchain. Depending whether or not the miner flag has
         been specified, you should allocate the mining process.
         """
-        self._address = '127.0.0.1:5001'
+        self._address = '127.0.0.1:5002'
         """
         self._blockchain = Blockchain(bootstrap, difficulty)
         if miner:
@@ -54,12 +52,11 @@ class Storage:
         data = {'origin': self._address,
                 'key':key,
                 'value':value}
-
-        r = requests.post(api_url, data=data)
+        print(data)
+        r = requests.get(api_url, data)
         if r.status_code != 200:
             print("[ERROR] No connection for retrieve value")
             return -1
-
         #TODO
         """
         callback = Callback(transaction, self._blockchain)

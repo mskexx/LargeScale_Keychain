@@ -23,20 +23,38 @@ diff = 4
 app = Flask(__name__)
 blockchain = Blockchain(b, diff, port)
 
+
 #RECEIVE OBJECTS
-@app.route('/transaction', methods=['POST'])
+@app.route('/transaction')
 def receive_transaction():
     """
     Receive a transaction from other peers
     :return:
     """
-    data = request.get_json()
-    transaction = Transaction(data['origin'], data['key'], data['value'])
-    blockchain._transactions.append(transaction)
-    response = {'message': 'Transaction received'}
-    return jsonify(response)
+    t = request.args
+    o = t['origin']
+    k = t['key']
+    v = t['value']
+    tran = Transaction(o, k, v)
+    h = blockchain.add_transaction(tran)
+    return jsonify({'transaction': h})
 
-@app.route('/newblock', methods=['POST'])
+@app.route("/put")
+def put():
+    """
+    Register a new value with key in the block
+    :return:
+    """
+    t = request.args
+    o = t['origin']
+    k =  t['key']
+    v =  t['value']
+    tran = Transaction(o, k, v)
+    blockchain.add_transaction2(tran)
+    return jsonify({'transaction': tran.get_hash()})
+
+
+@app.route('/newblock')
 def receive_block():
     """
     Receive a new mined block, validate it and if valid add to chain
@@ -51,7 +69,7 @@ def receive_block():
 
 
 #FULL CHAIN
-@app.route('/chain', methods=['GET'])
+@app.route('/chain')
 def chain():
     """
     Obtains the local chain and put it into json forman
@@ -68,7 +86,7 @@ def chain():
 
 
 #PEERS
-@app.route("/register", methods=['GET'])
+@app.route("/register")
 def register_peer():
     """
     Add to the list of peers the peer that called
@@ -78,7 +96,7 @@ def register_peer():
     blockchain.add_peer(addr)
     return jsonify({'message': 'OK'})
 
-@app.route("/peers", methods=['GET'])
+@app.route("/peers")
 def send_peers():
     """
     Send local list of peers to the caller
@@ -86,7 +104,7 @@ def send_peers():
     """
     return jsonify({'peers': blockchain._peers})
 
-@app.route("/resolve", methods=['GET'])
+@app.route("/resolve")
 def resolve_conflict():
     """
     Receive a petition that inform his chain is not the most common in the
@@ -98,20 +116,9 @@ def resolve_conflict():
     return jsonify({'message': 'OK'})
 
 #New transaction
-@app.route("/put", methods=['POST'])
-def put():
-    """
-    Register a new value with key in the block
-    :return:
-    """
-    o = request.get_json()['origin']
-    k =  request.get_json()['key']
-    v =  request.get_json()['value']
-    blockchain.add_transaction(Transaction(o, k, v))
-    return jsonify({'transaction': 0})
 
 #MINER
-@app.route("/mine", methods=['GET'])
+@app.route("/mine")
 def mine():
     """
     The peer will be mining
