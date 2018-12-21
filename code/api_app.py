@@ -9,7 +9,6 @@ def parse_arguments():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5001)
-    parser.add_argument("--addr", type=str, default='127.0.0.1')
     parser.add_argument("--difficulty", type=int, default=5,
                         help="Sets the difficulty of Proof of Work, only has "
                              "an effect with the `--miner` flag has been set.")
@@ -18,21 +17,17 @@ def parse_arguments():
     parser.add_argument("--bootstrap", type=str, default=None,
                         help="Sets the address of the bootstrap node.")
 
-
     arguments, _ = parser.parse_known_args()
     return arguments
 
 import socket
 address = socket.gethostbyname(socket.gethostname())
-port = str(parse_arguments().port)
-
-t ='127.0.0.1'+ ":" + port
-b = '127.0.0.1' + ":" + str(5001)
-diff = 4
 
 #CONFIGURATION
 app = Flask(__name__)
-blockchain = Blockchain(b, parse_arguments().difficulty, port)
+blockchain = Blockchain(parse_arguments().bootstrap,
+                        parse_arguments().difficulty,
+                        parse_arguments().port)
 
 
 #RECEIVE OBJECTS

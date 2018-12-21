@@ -5,20 +5,23 @@ NB: Feel free to extend or modify.
 """
 
 import argparse
-from keychain import Storage
-
-
+from store import Storage
+import subprocess
 def main(arguments):
+    #Launch node
+    #----------------
     storage = allocate_application(arguments)
 
     # Adding a key-value pair to the storage.
     key = "info8002"
     value = "fun"
     callback = storage.put(key, value, block=False)
-    return 0
     # Depending on how fast your blockchain is,
     # this will return a proper result.
     print(storage.retrieve(key))
+    while(True):
+        pass
+    return 0
     #storage._blockchain.mine()
 
     # Using the callback object,
