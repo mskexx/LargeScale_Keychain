@@ -21,12 +21,6 @@ class Block:
         self.prev_hash = 0x0
         self.timestamp = datetime.now().isoformat()
 
-    def get_block(self): #Or maybe __dict__  better
-        return {'blockNo': self.blockNo,
-                'proof': self.proof,
-                'prev_hash': self.prev_hash,
-                'timestamp': self.timestamp}
-
     def get_proof(self):
         """Return the proof of the current block."""
         return self.proof
@@ -37,12 +31,15 @@ class Block:
 
     def get_hash(self):
         h = hashlib.sha256()
+        ht = ''
+        for t in self._transactions:
+            ht += t.get_hash()
         h.update(
             str(self.proof).encode('utf-8') +
-            str(self._transactions).encode('utf-8') +
             str(self.prev_hash).encode('utf-8') +
             str(self.timestamp).encode('utf-8') +
-            str(self.blockNo).encode('utf-8'))
+            str(self.blockNo).encode('utf-8')+
+            ht.encode('utf-8'))
 
         return h.hexdigest()
 

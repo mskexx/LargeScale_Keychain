@@ -11,23 +11,24 @@ import json
 from datetime import datetime
 import time
 import copy
-
+from threading import Thread
 class TestEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, Transaction):
-            return vars(o)
+            return o.raw_transaction()
         elif isinstance(o, datetime):
             return o.isoformat()
         print(o)
         return json.JSONEncoder.default(self, o)
 
 class Blockchain:
-    def __init__(self, bootstrap, difficulty, myport):
+    def __init__(self, bootstrap, difficulty, myport, mine=False):
         """The bootstrap address serves as the initial entry point of
         the bootstrapping procedure. In principle it will contact the specified
         address, download the peerlist, and start the bootstrapping procedure.
         """
         self._address = '127.0.0.1' + ":" + str(myport)
+
         """
         import socket
         self._address = socket.gethostbyname(socket.gethostname())+":"+ str(
@@ -49,6 +50,8 @@ class Blockchain:
         if bootstrap != self._address:
             if not self._bootstrap(bootstrap):
                 print("[ERROR] Bootstrap not completed")
+        if mine:
+            miner = Thread(target=self.mine())
 
 
     def _add_genesis_block(self):
@@ -95,11 +98,13 @@ class Blockchain:
         block.prev_hash = prev_block.get_hash()
         block.blockNo = prev_block.blockNo + 1
         block.proof = proof
-        block._transactions = self._transactions
-        self._transactions = [] #Reset the actual transactions
+        if self._valid_proof(prev_block.get_proof(), prev_block.get_hash(),
+                             proof):
 
-        self._blocks.append(block)
-        return block
+            block._transactions = copy.deepcopy(self._transactions)
+            self._blocks.append(block)
+            return block
+        return None
 
     def proof_of_work(self, last_block):
         p_proof = last_block.proof
@@ -107,8 +112,6 @@ class Blockchain:
         proof = 0
         while not self._valid_proof(p_proof, p_hash, proof):
             proof +=1
-            #TODO: CHECK IF NEW BLOCK IN NETWORK BUT THEN WE HAD TO IMPLEMENT
-
         return proof
 
     def _valid_proof(self, prev_proof, prev_hash, proof):
@@ -131,7 +134,10 @@ class Blockchain:
     def chain_from_json(self, chain_data):
         builded_chain = []
         for bd in chain_data:
-            block_dict = json.loads(str(bd))
+            try:
+                block_dict = json.loads(str(bd))
+            except:
+                block_dict = bd
             block = Block()
             block.timestamp = block_dict['timestamp']
             block.blockNo = block_dict['blockNo']
@@ -156,8 +162,9 @@ class Blockchain:
         block.timestamp = block_data['timestamp']
 
         conf_transactions = []
-        for t in block_data['_transactions']: #List of hash
+        for t in block_data['_transactions']:
             t1 = Transaction(t['origin'], t['key'], t['value'], t['timestamp'])
+
             if t1 in self._transactions:
                 conf_transactions.append(t1)
             else:
@@ -171,10 +178,19 @@ class Blockchain:
 
     def valid_block(self, block):
         prev_block = self._blocks[-1]
+        '''
+        print("--------------------------------------")
+        print("Prev hash", prev_block.get_hash())
+        print("Block prev hash", block.get_prevhash())
+        print("--------------------------------------")
+        print("Block no >", prev_block.get_blockNo(), block.get_blockNo())
+        print("--------------------------------------")
+        '''
         p1 = prev_block.get_hash() == block.get_prevhash()
         p2 = prev_block.get_blockNo() + 1 == block.get_blockNo()
         p3 =  self._valid_proof(prev_block.get_proof(), prev_block.get_hash(),
                                    block.get_proof())
+
         return p1 and p2 and p3
 
         # BOOTSTRAP AND CONFLICTS WITH THE CHAIN -----------------------------------
@@ -251,11 +267,6 @@ class Blockchain:
                 print("[ERROR] No connection with peer on: " + peer)
                 self._peers.remove(peer)
 
-            # testing purpose:
-            try:
-                r = requests.get('http://' + peer + '/peers')
-            except:
-                pass
         # -----------------------------------------------------------------------
         # bcast to get the blockchain
         winners, chain_data = self.vote_chain()
@@ -298,27 +309,6 @@ class Blockchain:
             return True
         return False
 
-
-    def mine(self):
-        """Implements the mining procedure."""
-        if len(self._transactions < 1):
-            time.sleep(2)
-        else:
-            last_block = self._blocks[-1]
-            proof = self.proof_of_work(last_block)
-
-            new_block = self.add_block(proof)
-            print("[MINING] BLOCK " + str(new_block.blockNo) + " MINED")
-
-            data = json.dumps(new_block.__dict__, sort_keys=True,
-                cls=TestEncoder)
-
-            for peer in self._peers:
-                r = requests.get('http://' + peer + '/newblock', data)
-                if r.status_code != 200:
-                    print("[ERROR] Sending mined block to peer on: ", peer)
-            return new_block
-
     def to_json(self):
         chain = []
         for block in self._blocks:
@@ -328,3 +318,28 @@ class Blockchain:
     def block_to_json(self, block):
         return json.dumps(block.__dict__, sort_keys=True,
                    cls=TestEncoder)
+
+    def mine(self):
+        """Implements the mining procedure."""
+        while(True):
+            if len(self._transactions) < 1:
+                time.sleep(2)
+            else:
+                last_block = self._blocks[-1]
+                proof = self.proof_of_work(last_block)
+
+                new_block = self.add_block(proof)
+                if new_block:
+                    for t in new_block.get_transactions():
+                        self._transactions.remove(t)
+
+                    print("[MINING] BLOCK " + str(new_block.blockNo) + " "
+                          "MINED: "+new_block.get_hash())
+
+                    data = json.dumps(new_block.__dict__, sort_keys=True,
+                    cls=TestEncoder)
+
+                    for peer in self._peers:
+                        r = requests.get('http://' + peer + '/newblock', data)
+                        if r.status_code != 200:
+                            print("[ERROR] Sending mined block to peer on: ", peer)

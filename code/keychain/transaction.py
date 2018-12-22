@@ -20,11 +20,6 @@ class Transaction:
         else:
             self.timestamp = t
 
-    def get_transaction(self):
-        return {"key"   : self.key,
-                "value": self.value,
-                "origin": self.origin}
-
     def raw_transaction(self):
         return{"key"   : self.key,
                 "value": self.value,

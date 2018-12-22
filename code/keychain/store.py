@@ -6,26 +6,26 @@ NB: Feel free to extend or modify.
 
 import requests
 from keychain.api_app import app
+from threading import Thread
+import time
 
 class Callback:
-    def __init__(self, transaction, chain):
+    def __init__(self, transaction, app):
         self._transaction = transaction
-        self._chain = chain
+        self._app = app
 
     def wait(self):
         """Wait until the transaction appears in the blockchain."""
         while not self.completed():
-            #TODO How do you update the chain here? Wait for new blocks..
-            return True #CHANGE THIS
-        return True
+            time.sleep(4)
+            break #Break or return?-
+
 
     def completed(self):
         """Polls the blockchain to check if the data is available."""
-        for block in reversed(self._chain._blocks):
-            for transaction in block.get_transactions():
-                if transaction.get_hash() == self._transaction.get_hash():
-                    return True
-        return False
+
+        return self._app.retrieve(self._transaction['key']) == \
+               self._transaction['value']
 
 
 class Storage:
@@ -35,7 +35,7 @@ class Storage:
         been specified, you should allocate the mining process.
         """
         self._address = '127.0.0.1:5002'
-        server = app.run()
+        server = Thread(target=app.run())
 
         """
         self._blockchain = Blockchain(bootstrap, difficulty)
@@ -51,6 +51,7 @@ class Storage:
         has been put onto the blockchain, or if an error occurred.
         """
         api_url = 'http://' + self._address + '/put'
+
         data = {'origin': self._address,
                 'key':key,
                 'value':value}
@@ -60,14 +61,10 @@ class Storage:
             print("[ERROR] No connection for retrieve value")
             return -1
 
-        #TODO
-        """
-        callback = Callback(transaction, self._blockchain)
+        callback = Callback(data, self)
         if block:
             callback.wait()
-
         return callback
-        """
 
 
     def retrieve(self, key):

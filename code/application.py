@@ -15,13 +15,10 @@ def main(arguments):
     # Adding a key-value pair to the storage.
     key = "info8002"
     value = "fun"
-    time.sleep(10)
     callback = storage.put(key, value, block=False)
     # Depending on how fast your blockchain is,
     # this will return a proper result.
     print(storage.retrieve(key))
-    return 0
-    #storage._blockchain.mine()
 
     # Using the callback object,
     # you can also wait for the operation to be completed.

@@ -70,9 +70,11 @@ def receive_block():
 
     new_block = blockchain.block_from_json(data)
     if new_block:
+        print("[BLOCK] New block in chain")
         blockchain._blocks.append(new_block)
         response = {'message': 'Block confirmed'}
     else:
+        print("[BLOCK] New block REFUSED!")
         response = {'message': 'Block denied'}
     return jsonify(response)
 
@@ -84,7 +86,6 @@ def chain():
     Obtains the local chain and put it into json format
     :return: Local chain to the peer
     """
-    blocks = []
     b = blockchain.to_json()
 
     return jsonify({'chain': b})
