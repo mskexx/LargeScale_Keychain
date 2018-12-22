@@ -5,9 +5,9 @@ NB: Feel free to extend or modify.
 """
 
 import requests
-from keychain.api_app import app
-from threading import Thread
+import subprocess
 import time
+
 
 class Callback:
     def __init__(self, transaction, app):
@@ -18,8 +18,7 @@ class Callback:
         """Wait until the transaction appears in the blockchain."""
         while not self.completed():
             time.sleep(4)
-            break #Break or return?-
-
+            break  # Break or return?-
 
     def completed(self):
         """Polls the blockchain to check if the data is available."""
@@ -29,20 +28,13 @@ class Callback:
 
 
 class Storage:
-    def __init__(self, bootstrap, miner, difficulty):
+    def __init__(self, bootstrap, miner, difficulty, port):
         """Allocate the backend storage of the high level API, i.e.,
         your blockchain. Depending whether or not the miner flag has
         been specified, you should allocate the mining process.
         """
-        self._address = '127.0.0.1:5002'
-        server = Thread(target=app.run())
-
-        """
-        self._blockchain = Blockchain(bootstrap, difficulty)
-        if miner:
-            new_block = self._blockchain.mine()
-        """
-
+        self._address = '127.0.0.1:' + str(port)
+        # self.app = subprocess.Popen(cmd)
 
     def put(self, key, value, block=True):
         """Puts the specified key and value on the Blockchain.
@@ -51,21 +43,19 @@ class Storage:
         has been put onto the blockchain, or if an error occurred.
         """
         api_url = 'http://' + self._address + '/put'
-
         data = {'origin': self._address,
-                'key':key,
-                'value':value}
+                'key': key,
+                'value': value}
 
         r = requests.get(api_url, data)
         if r.status_code != 200:
-            print("[ERROR] No connection for retrieve value")
-            return -1
+            print("[ERROR] No connection for put value")
+            return None
 
         callback = Callback(data, self)
         if block:
             callback.wait()
         return callback
-
 
     def retrieve(self, key):
         """Searches the most recent value of the specified key.
@@ -76,24 +66,24 @@ class Storage:
         """
         return self.retrieve_all(key, True)
 
-
     def retrieve_all(self, key, last=False):
         """
         Retrieves all values associated with the specified key on the
         complete blockchain.
         """
-        api_url = 'http://'+self._address+'/chain'
+        api_url = 'http://' + self._address + '/chain'
         r = requests.get(api_url)
         if r.status_code != 200:
             print("[ERROR] No connection for retrieve blockchain")
             return -1
         chain = r.json()["chain"]
-
+        import json
         results = []
         for block in reversed(chain):
+            block = json.loads(block)
             for transaction in reversed(block['_transactions']):
                 if transaction['key'] == key:
-                    if last: #Last value stored = retrieve
+                    if last:  # Last value stored = retrieve
                         return transaction['value']
                     results.append(transaction['value'])
         return results

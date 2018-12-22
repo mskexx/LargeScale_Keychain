@@ -7,18 +7,19 @@ NB: Feel free to extend or modify.
 import argparse
 from keychain import store
 import time
-def main(arguments):
-    #Launch node
-    #----------------
-    storage = allocate_application(arguments)
 
+
+def main(arguments):
+    # Launch node
+    # ----------------
+    storage = allocate_application(arguments)
     # Adding a key-value pair to the storage.
     key = "info8002"
-    value = "fun"
+    value = "funFUNfun"
     callback = storage.put(key, value, block=False)
     # Depending on how fast your blockchain is,
     # this will return a proper result.
-    print(storage.retrieve(key))
+    print(">> Last value: ",storage.retrieve(key))
 
     # Using the callback object,
     # you can also wait for the operation to be completed.
@@ -26,15 +27,16 @@ def main(arguments):
 
     # Now the key should be available,
     # unless a different node `put` a new value.
-    print(storage.retrieve(key))
+    print(">> Last value after waiting", storage.retrieve(key))
 
     # Show all values of the key.
-    print(storage.retrieve_all(key))
+    print(">> History of values: ", ' <- '.join(storage.retrieve_all(key)))
+    print("Finish application")
 
 
 def allocate_application(arguments):
     application = store.Storage(
-        port = arguments.port,
+        port=arguments.port,
         bootstrap=arguments.bootstrap,
         miner=arguments.miner,
         difficulty=arguments.difficulty)

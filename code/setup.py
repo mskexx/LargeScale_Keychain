@@ -10,7 +10,6 @@ import re
 from setuptools import find_packages
 from setuptools import setup
 
-
 exclusions = ["doc", "experiments", "application"]
 packages = find_packages(exclude=exclusions)
 
@@ -18,7 +17,7 @@ packages = find_packages(exclude=exclusions)
 with open(os.path.join("keychain", "__init__.py"), "rt") as fh:
     try:
         _version = re.search('__version__\s*=\s*"(?P<version>.*)"\n',
-        fh.read()).group("version")
+                             fh.read()).group("version")
     except:
         pass
 

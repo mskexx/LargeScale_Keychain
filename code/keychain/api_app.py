@@ -1,10 +1,10 @@
 import requests
 from flask import Flask, request, jsonify
-from keychain.transaction import Transaction
-from keychain.blockchain import Blockchain
+from transaction import Transaction
+from blockchain import Blockchain
 
 
-def parse_arguments():
+def parse_arguments2():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5001)
@@ -19,17 +19,16 @@ def parse_arguments():
     arguments, _ = parser.parse_known_args()
     return arguments
 
-import socket
-address = socket.gethostbyname(socket.gethostname())
 
-#CONFIGURATION
+# CONFIGURATION
 app = Flask(__name__)
-blockchain = Blockchain(parse_arguments().bootstrap,
-                        parse_arguments().difficulty,
-                        parse_arguments().port)
+blockchain = Blockchain(parse_arguments2().bootstrap,
+                        parse_arguments2().difficulty,
+                        parse_arguments2().port,
+                        parse_arguments2().miner)
 
 
-#RECEIVE OBJECTS
+# RECEIVE OBJECTS
 @app.route('/transaction')
 def receive_transaction():
     """
@@ -45,6 +44,7 @@ def receive_transaction():
     h = blockchain.add_transaction(tran)
     return jsonify({'transaction': h})
 
+
 @app.route("/put")
 def put():
     """
@@ -53,8 +53,8 @@ def put():
     """
     t = request.args
     o = t['origin']
-    k =  t['key']
-    v =  t['value']
+    k = t['key']
+    v = t['value']
     tran = Transaction(o, k, v)
     blockchain.add_transaction2(tran)
     return jsonify({'transaction': tran.get_hash()})
@@ -79,7 +79,7 @@ def receive_block():
     return jsonify(response)
 
 
-#FULL CHAIN
+# FULL CHAIN
 @app.route('/chain')
 def chain():
     """
@@ -87,11 +87,10 @@ def chain():
     :return: Local chain to the peer
     """
     b = blockchain.to_json()
-
     return jsonify({'chain': b})
 
 
-#PEERS
+# PEERS
 @app.route("/register")
 def register_peer():
     """
@@ -102,6 +101,7 @@ def register_peer():
     blockchain.add_peer(addr)
     return jsonify({'message': 'OK'})
 
+
 @app.route("/peers")
 def send_peers():
     """
@@ -109,6 +109,7 @@ def send_peers():
     :return: list of peers
     """
     return jsonify({'peers': blockchain._peers})
+
 
 @app.route("/resolve")
 def resolve_conflict():
@@ -121,9 +122,10 @@ def resolve_conflict():
     blockchain.replace_chain(chain_data)
     return jsonify({'message': 'OK'})
 
-#New transaction
 
-#MINER
+# New transaction
+
+# MINER
 @app.route("/mine")
 def mine():
     """
@@ -133,8 +135,12 @@ def mine():
     blockchain.mine()
     return jsonify({'mining': True})
 
-#bcast / check nodes / block new
 
-#If app not in the end = 404
-#Maybe launched with python call systems from Store
-app.run(debug=True, port=parse_arguments().port)
+# bcast / check nodes / block new
+
+# If app not in the end = 404
+# Maybe launched with python call systems from Store
+
+if __name__ == "__main__":
+    print("> Server INIT")
+    app.run(debug=True, port=parse_arguments2().port)

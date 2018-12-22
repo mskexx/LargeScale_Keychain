@@ -2,10 +2,12 @@ import hashlib
 from datetime import datetime
 import json
 
+
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
             return o.isoformat()
+
 
 class Transaction:
     def __init__(self, origin, key, value, t=False):
@@ -21,7 +23,7 @@ class Transaction:
             self.timestamp = t
 
     def raw_transaction(self):
-        return{"key"   : self.key,
+        return {"key": self.key,
                 "value": self.value,
                 "origin": self.origin,
                 "timestamp": self.timestamp}
@@ -31,7 +33,7 @@ class Transaction:
         h.update(
             str(self.key).encode('utf-8') +
             str(self.value).encode('utf-8') +
-            str(self.origin).encode('utf-8')+
+            str(self.origin).encode('utf-8') +
             str(self.timestamp).encode('utf-8'))
         return h.hexdigest()
 

@@ -1,7 +1,8 @@
 from datetime import datetime
 import hashlib
-from keychain.transaction import Transaction
+from transaction import Transaction
 import json
+
 
 class TestEncoder(json.JSONEncoder):
     def default(self, o):
@@ -11,6 +12,7 @@ class TestEncoder(json.JSONEncoder):
             return o.isoformat()
         print(o)
         return json.JSONEncoder.default(self, o)
+
 
 class Block:
     def __init__(self):
@@ -38,7 +40,7 @@ class Block:
             str(self.proof).encode('utf-8') +
             str(self.prev_hash).encode('utf-8') +
             str(self.timestamp).encode('utf-8') +
-            str(self.blockNo).encode('utf-8')+
+            str(self.blockNo).encode('utf-8') +
             ht.encode('utf-8'))
 
         return h.hexdigest()
